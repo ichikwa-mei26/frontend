@@ -10,15 +10,17 @@ type TodoTypes = { //ここでTodoの型の定義
 
 type AddTodoType = { //新しく追加するTodoの構造を定義
   todo: string;
+  editTodoName: string;
 };
 
 function App() { //APPコンポーネント
-  const { register, handleSubmit } = useForm<AddTodoType>();
+  const { register, handleSubmit, reset } = useForm<AddTodoType>();
   const [todos, setTodos] = useState<TodoTypes[]>([]);
+  const [isEdit, setIsEdit] = useState({id: "", todo: ""});
 
   //awaitとはaxios.post が完了するまで、次の行の実行を一時停止します。
   const addTodo =async (event: AddTodoType) => {//新しいTodoをサーバーに追加するためにPOSTクエストを送信
-    const { todo } = event;//リクエストが成功すると、新しい Todo アイテムが返され、それを todos ステートに追加します
+    const { todo } = event;//リクエストが成功すると、新しい Todoアイテムが返され、それをtodosステートに追加します
     console.log(todo); 
     await axios
      .post("http://localhost:3000/add" ,{
@@ -26,7 +28,7 @@ function App() { //APPコンポーネント
         todo,
       },
      })
-     .then((response) => { //.then: Promise が解決されたときに実行されるコールバック関数を指定します。
+     .then((response) => { //.then: Promiseが解決されたときに実行されるコールバック関数を指定します。
       console.log(response.data);
       const todo = response.data;
       setTodos((preTodos) => [todo, ...preTodos]);//Reactステート更新関数で、現在のtodosステートに新しいtodoを追加します。
@@ -34,6 +36,48 @@ function App() { //APPコンポーネント
      .catch((error) => { //エラーが発生した場合に実行されるコードを含みます。
       console.log(error);
      });
+  };
+
+  const deleteTodo = async (id: string) => {
+    console.log(id);
+
+    await axios
+    .delete("http://localhost:3000/delete", {
+      data: {
+        id,
+      },
+    })
+    .then((response) => {
+      console.log(response);
+      const newTodos = todos.filter((todo) => todo.id !== id);
+      setTodos(newTodos);
+    })
+    .catch((e) => {
+      console.log(e.message);
+      setTodos(todos);
+    });
+  };
+
+  const editTodo = async ({ editTodoName }: AddTodoType) => {
+    await axios
+    .put("http://localhost:3000/update", {
+      data: {
+        id: isEdit.id,
+        todo: editTodoName,
+      },
+    })
+    .then((response) => {
+      console.log(response.data);
+      const newTodos = todos.map((todo) => {
+        return todo.id === response.data.id ? response.data : todo;
+      });
+      setIsEdit({ id: "", todo: "" });
+      setTodos(newTodos);
+      reset();
+    })
+    .catch((e) => {
+      console.log(e.message);
+    });
   };
 
   useEffect(() => { //コンポーネントがマウントされたときに、サーバーから既存のTodoアイテムを取得するためにGETリクエストを送信します。
@@ -53,7 +97,25 @@ function App() { //APPコンポーネント
       <button type="submit">add</button>
     </form>
       {todos.map((todo) => (
-        <p key={todo.id}>{todo.todo}</p>
+        <div key={todo.id} style={{ display: "flex" }}>
+          {isEdit.id === todo.id ? (
+            <form onSubmit={handleSubmit(editTodo)}>
+              <input {...register("editTodoName")} type="text" />
+              <button>send</button>
+            </form>
+          ) : (
+            <>
+            <p>{todo.todo}</p>
+            <button
+            onClick={() => setIsEdit({ id: todo.id, todo: todo.todo})}
+            >
+              edit
+            </button>
+            </>
+          )}
+
+          <button onClick={() => deleteTodo(todo.id)}>delete</button>
+        </div>
       ))}
     </>
   );
